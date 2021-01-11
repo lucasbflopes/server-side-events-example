@@ -11,20 +11,26 @@
   </ul>
 </body>
 <script>
-  const eventSource = new EventSource("http://localhost:8080/events");
+  document.addEventListener("DOMContentLoaded", () => {
+    const eventSource = new EventSource("http://localhost:8080/sse/subscribe");
 
-  eventSource.addEventListener("foo", function(event) {
-    const ul = document.getElementById("events");
-    const item = document.createElement("li");
+    eventSource.addEventListener("dispatched", event => {
+      const ul = document.getElementById("events");
+      const item = document.createElement("li");
 
-    item.textContent = `${event.data} @ ${event.timeStamp}`;
+      item.textContent = `${event.data}`;
 
-    ul.appendChild(item);
-  });
+      ul.appendChild(item);
+    });
 
-  eventSource.onerror = function(err) {
-    console.warn(err);
-    //eventSource.close();
-  }
+    eventSource.onerror = function(err) {
+      console.warn(err);
+    }
+
+    window.addEventListener("beforeunload", () => {
+      eventSource.close();
+    })
+  })
+  
 </script>
 </html>
