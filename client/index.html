@@ -16,14 +16,14 @@
 
     eventSource.addEventListener("dispatched", event => {
       const ul = document.getElementById("events");
-      const item = document.createElement("li");
+      const li = document.createElement("li");
 
-      item.textContent = `${event.data}`;
+      li.textContent = `${event.data}`;
 
-      ul.appendChild(item);
+      ul.appendChild(li);
     });
 
-    eventSource.onerror = function(err) {
+    eventSource.onerror = err => {
       console.warn(err);
     }
 
@@ -31,6 +31,5 @@
       eventSource.close();
     })
   })
-  
 </script>
 </html>
