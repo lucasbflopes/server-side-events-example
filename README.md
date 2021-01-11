@@ -1,6 +1,8 @@
 # Server Side Events
 Server side events is a unidirectionally way to stream notifications/events to clients. It sits on top of TCP/IP and works by keeping a long running connection between client and server through which the server is able to stream event data.
 
+<img src="https://github.com/lucasbflopes/server-side-events-example/blob/master/example.png" />
+
 # Run server
 
 To start the server run:
