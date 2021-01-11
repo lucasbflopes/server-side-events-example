@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SSE - Client</title>
+</head>
+<body>
+  <h1>Events:</h1>
+  <ul id="events">
+  </ul>
+</body>
+<script>
+  const eventSource = new EventSource("http://localhost:8080/events");
+
+  eventSource.addEventListener("foo", function(event) {
+    const ul = document.getElementById("events");
+    const item = document.createElement("li");
+
+    item.textContent = `${event.data} @ ${event.timeStamp}`;
+
+    ul.appendChild(item);
+  });
+
+  eventSource.onerror = function(err) {
+    console.warn(err);
+    //eventSource.close();
+  }
+</script>
+</html>
