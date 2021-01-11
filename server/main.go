@@ -66,13 +66,17 @@ func (s server) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Add("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Content-Type", "text/event-stream")
 
 	msgs := make(chan string)
 	unsubscribe := s.eventStore.Subscribe(msgs)
-
-	fmt.Printf("\rCurrent number of observers: %d", len(s.eventStore.observers))
 
 processing:
 	for {
@@ -83,13 +87,10 @@ processing:
 			case m := <-msgs:
 				fmt.Fprint(w,  "event: dispatched\n")
 				fmt.Fprintf(w, "data: %s\n\n", m)
-
-				if f, ok := w.(http.Flusher); !ok {
-					log.Fatal("Cannot flush response body")
-				} else {
-					f.Flush()
-				}				
+			case <-time.After(30 * time.Second):
+				fmt.Fprint(w, ": keepalive\n\n")
 		}
+		flusher.Flush()
 	}
 }
 
