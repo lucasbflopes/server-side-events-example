@@ -37,8 +37,8 @@ func (s server) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Content-Type", "text/event-stream")
 
-	msgs := make(chan string, 100)
-	unsubscribe := s.eventStore.Subscribe(msgs)
+	subscriber := event.NewSubscriber()
+	unsubscribe := s.eventStore.Subscribe(subscriber)
 
 processing:
 	for {
@@ -46,9 +46,9 @@ processing:
 		case <-r.Context().Done():
 			unsubscribe()
 			break processing
-		case m := <-msgs:
+		case m := <-subscriber.EventStream():
 			fmt.Fprint(w, "event: dispatched\n")
-			fmt.Fprintf(w, "data: %s\n\n", m)
+			fmt.Fprintf(w, "data: %s\n\n", m.Payload)
 		case <-time.After(30 * time.Second):
 			fmt.Fprint(w, ": keepalive\n\n")
 		}
@@ -70,7 +70,7 @@ func (s server) handleDispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.eventStore.Dispatch(data)
+	s.eventStore.Dispatch(event.Event{Payload: data})
 }
 
 func main() {

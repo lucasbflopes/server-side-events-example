@@ -5,71 +5,63 @@ import (
 	"sync/atomic"
 )
 
-// Store stores observers and notify them when a new event is dispatched
+// Store stores subscribers and notify them when a new event is dispatched.
 type Store struct {
-	observerLock *sync.RWMutex
-	id           uint64
-	observers    map[uint64]chan<- string
+	subscribersLock *sync.RWMutex
+	id              uint64
+	subscribers     map[uint64]Subscriber
 }
 
 // NewStore returns a new instance of a Store
 func NewStore() *Store {
 	return &Store{
-		observerLock: &sync.RWMutex{},
-		observers:    make(map[uint64]chan<- string),
+		subscribersLock: &sync.RWMutex{},
+		subscribers:     make(map[uint64]Subscriber),
 	}
 }
 
-// Subscribe adds a new observer to the store through a channel to be notified.
-// It returns a function that when called unsubscribes the observer from the store.
-func (e *Store) Subscribe(channel chan<- string) func() {
+// Subscribe adds a new subscriber to the store.
+// It returns a function that when called unsubscribes the subscriber from the store.
+func (e *Store) Subscribe(subscriber Subscriber) func() {
 	id := e.nextID()
 
-	e.addObserver(id, channel)
+	e.addSubscriber(id, subscriber)
 
-	return func() { e.removeObserver(id) }
+	return func() { e.removeSubscriber(id) }
 }
 
-// Dispatch sends a new event to the store, broadcasting to all observers
-func (e *Store) Dispatch(message string) {
-	e.observerLock.RLock()
-	defer e.observerLock.RUnlock()
+// Dispatch sends a new event to the store, broadcasting to all subscribers.
+func (e *Store) Dispatch(event Event) {
+	e.subscribersLock.RLock()
+	defer e.subscribersLock.RUnlock()
 
-	for _, c := range e.observers {
-		select {
-		case c <- message:
-		default:
-			// If the observer cannot process the message right away then we drop it to avoid backpressure.
-		}
+	for _, o := range e.subscribers {
+		o.Publish(event)
 	}
 }
 
-// Subscriptions return the number of observers subscribed to the store
+// Subscriptions return the number of subscribers to the store.
 func (e *Store) Subscriptions() int {
-	return e.countObservers()
+	e.subscribersLock.RLock()
+	defer e.subscribersLock.RUnlock()
+
+	return len(e.subscribers)
 }
 
 func (e *Store) nextID() uint64 {
 	return atomic.AddUint64(&e.id, 1)
 }
 
-func (e *Store) addObserver(id uint64, channel chan<- string) {
-	e.observerLock.Lock()
-	defer e.observerLock.Unlock()
+func (e *Store) addSubscriber(id uint64, subscriber Subscriber) {
+	e.subscribersLock.Lock()
+	defer e.subscribersLock.Unlock()
 
-	e.observers[id] = channel
+	e.subscribers[id] = subscriber
 }
 
-func (e *Store) removeObserver(id uint64) {
-	e.observerLock.Lock()
-	defer e.observerLock.Unlock()
+func (e *Store) removeSubscriber(id uint64) {
+	e.subscribersLock.Lock()
+	defer e.subscribersLock.Unlock()
 
-	delete(e.observers, id)
-}
-
-func (e *Store) countObservers() int {
-	e.observerLock.RLock()
-	defer e.observerLock.RUnlock()
-
-	return len(e.observers)
+	delete(e.subscribers, id)
 }
