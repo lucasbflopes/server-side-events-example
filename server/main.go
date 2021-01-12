@@ -4,51 +4,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 	"time"
+
+	"github.com/lucasbflopes/server-side-events-example/event"
 )
 
-type eventStore struct {
-	subLock *sync.Mutex
-	id int
-	observers map[int]chan<- string
-}
-
-func newEventStore() *eventStore {
-	return &eventStore{
-		subLock: &sync.Mutex{},
-		observers: make(map[int]chan<- string),
-	}
-}
-
-func (e *eventStore) Subscribe(channel chan<- string) func() {
-	e.subLock.Lock()
-	defer e.subLock.Unlock()
-
-	e.observers[e.id] = channel
-
-	result := func(m map[int]chan<- string, id int) func() {
-		return func() {
-			delete(m, id)
-		}
-	}(e.observers, e.id)
-
-	e.id++
-
-	return result
-}
-
-func (e *eventStore) Dispatch(message string) {
-	for _, c := range e.observers {
-		select {
-			case c <- message:
-			default:
-		}
-	}
-}
-
 type server struct {
-	eventStore *eventStore
+	eventStore *event.Store
 }
 
 func (s server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -75,20 +37,20 @@ func (s server) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Content-Type", "text/event-stream")
 
-	msgs := make(chan string)
+	msgs := make(chan string, 100)
 	unsubscribe := s.eventStore.Subscribe(msgs)
 
 processing:
 	for {
 		select {
-			case <-r.Context().Done():
-				unsubscribe()
-				break processing
-			case m := <-msgs:
-				fmt.Fprint(w,  "event: dispatched\n")
-				fmt.Fprintf(w, "data: %s\n\n", m)
-			case <-time.After(30 * time.Second):
-				fmt.Fprint(w, ": keepalive\n\n")
+		case <-r.Context().Done():
+			unsubscribe()
+			break processing
+		case m := <-msgs:
+			fmt.Fprint(w, "event: dispatched\n")
+			fmt.Fprintf(w, "data: %s\n\n", m)
+		case <-time.After(30 * time.Second):
+			fmt.Fprint(w, ": keepalive\n\n")
 		}
 		flusher.Flush()
 	}
@@ -112,12 +74,14 @@ func (s server) handleDispatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	s := server{ eventStore: newEventStore() }
+	s := server{
+		eventStore: event.NewStore(),
+	}
 
 	go func() {
 		for {
 			time.Sleep(500 * time.Millisecond)
-			fmt.Printf("\rCurrent number of observers: %d", len(s.eventStore.observers))
+			fmt.Printf("\rCurrent number of observers: %d", s.eventStore.Subscriptions())
 		}
 	}()
 
