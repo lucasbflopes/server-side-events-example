@@ -24,13 +24,13 @@ func (s server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s server) handleSubscribe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, "Server cannot add subscription", http.StatusInternalServerError)
 		return
 	}
 
@@ -58,15 +58,14 @@ processing:
 
 func (s server) handleDispatch(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	data := r.URL.Query().Get("data")
 
 	if data == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprint(w, "`data` value is empty or missing from query string")
+		http.Error(w, "`data` value is empty or missing from query string", http.StatusBadRequest)
 		return
 	}
 
