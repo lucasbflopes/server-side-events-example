@@ -27,7 +27,9 @@ func (e *Store) Subscribe(subscriber Subscriber) func() {
 
 	e.addSubscriber(id, subscriber)
 
-	return func() { e.removeSubscriber(id) }
+	return func() {
+		e.removeSubscriber(id)
+	}
 }
 
 // Dispatch sends a new event to the store, broadcasting to all subscribers.
@@ -35,8 +37,10 @@ func (e *Store) Dispatch(event Event) {
 	e.subscribersLock.RLock()
 	defer e.subscribersLock.RUnlock()
 
-	for _, o := range e.subscribers {
-		o.Publish(event)
+	for _, subscriber := range e.subscribers {
+		go func(s Subscriber) {
+			s.Publish(event)
+		}(subscriber)
 	}
 }
 
